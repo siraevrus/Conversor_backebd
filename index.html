@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Курсы валют</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .last-update {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 1.1em;
+        }
+
+        .last-update strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .base-currency {
+            text-align: center;
+            font-size: 1.3em;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .rates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .rate-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .rate-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .rate-currency {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .rate-value {
+            color: #667eea;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #c33;
+            margin-bottom: 20px;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .rates-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💱 Курсы валют</h1>
+            <div class="last-update" id="lastUpdate">
+                <strong>Загрузка...</strong>
+                <span id="updateTime">-</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="base-currency" id="baseCurrency">
+                Базовая валюта: USD
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Поиск валюты (например: EUR, RUB, GBP)...">
+            </div>
+
+            <div id="errorMessage" class="error" style="display: none;"></div>
+
+            <div id="loading" class="loading">
+                Загрузка курсов валют...
+            </div>
+
+            <div id="ratesContainer" style="display: none;">
+                <div class="rates-grid" id="ratesGrid"></div>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalRates">0</div>
+                        <div class="stat-label">Всего валют</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="visibleRates">0</div>
+                        <div class="stat-label">Отображается</div>
+                    </div>
+                </div>
+
+                <button class="refresh-btn" id="refreshBtn" onclick="loadRates()">
+                    🔄 Обновить курсы
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allRates = [];
+        let baseCurrency = 'USD';
+        let lastUpdateTime = null;
+
+        // Определение API URL
+        function getApiUrl() {
+            const host = window.location.hostname;
+            const port = window.location.port;
+            const protocol = window.location.protocol;
+            let baseUrl = protocol + '//' + host;
+            if (port) {
+                baseUrl += ':' + port;
+            }
+            return baseUrl + '/api';
+        }
+
+        // Загрузка курсов валют
+        async function loadRates() {
+            const loadingEl = document.getElementById('loading');
+            const ratesContainer = document.getElementById('ratesContainer');
+            const errorMessage = document.getElementById('errorMessage');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const lastUpdateEl = document.getElementById('lastUpdate');
+            const updateTimeEl = document.getElementById('updateTime');
+
+            // Показываем загрузку
+            loadingEl.style.display = 'block';
+            ratesContainer.style.display = 'none';
+            errorMessage.style.display = 'none';
+            refreshBtn.disabled = true;
+
+            try {
+                const apiUrl = getApiUrl() + '/rates';
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Ошибка загрузки данных');
+                }
+
+                // Сохраняем данные
+                allRates = Object.entries(data.rates || {});
+                baseCurrency = data.base || 'USD';
+                lastUpdateTime = allRates.length > 0 ? allRates[0][1].last_updated : null;
+
+                // Обновляем интерфейс
+                document.getElementById('baseCurrency').textContent = 
+                    `Базовая валюта: ${baseCurrency}`;
+
+                if (lastUpdateTime) {
+                    const updateDate = new Date(lastUpdateTime);
+                    const formattedDate = updateDate.toLocaleString('ru-RU', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    updateTimeEl.textContent = formattedDate;
+                } else {
+                    updateTimeEl.textContent = 'Данные не найдены';
+                }
+
+                // Отображаем курсы
+                displayRates(allRates);
+                
+                loadingEl.style.display = 'none';
+                ratesContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Ошибка:', error);
+                errorMessage.textContent = 'Ошибка загрузки курсов: ' + error.message;
+                errorMessage.style.display = 'block';
+                loadingEl.style.display = 'none';
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Отображение курсов
+        function displayRates(rates) {
+            const ratesGrid = document.getElementById('ratesGrid');
+            const totalRatesEl = document.getElementById('totalRates');
+            const visibleRatesEl = document.getElementById('visibleRates');
+
+            ratesGrid.innerHTML = '';
+
+            rates.forEach(([currency, rateInfo]) => {
+                const rateItem = document.createElement('div');
+                rateItem.className = 'rate-item';
+                rateItem.innerHTML = `
+                    <div class="rate-currency">${currency}</div>
+                    <div class="rate-value">${parseFloat(rateInfo.rate).toFixed(4)}</div>
+                `;
+                ratesGrid.appendChild(rateItem);
+            });
+
+            totalRatesEl.textContent = allRates.length;
+            visibleRatesEl.textContent = rates.length;
+        }
+
+        // Поиск валют
+        function filterRates(searchTerm) {
+            if (!searchTerm.trim()) {
+                displayRates(allRates);
+                return;
+            }
+
+            const term = searchTerm.toUpperCase();
+            const filtered = allRates.filter(([currency]) => 
+                currency.includes(term)
+            );
+
+            displayRates(filtered);
+        }
+
+        // Обработка поиска
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            filterRates(e.target.value);
+        });
+
+        // Автоматическое обновление каждые 5 минут
+        setInterval(() => {
+            loadRates();
+        }, 5 * 60 * 1000);
+
+        // Загрузка при загрузке страницы
+        loadRates();
+    </script>
+</body>
+</html>
+

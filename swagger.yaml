@@ -1,0 +1,429 @@
+openapi: 3.0.0
+info:
+  title: Currency API
+  description: API для получения актуальных курсов валют и конвертации валют для мобильного приложения
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000/api
+    description: Локальный сервер разработки
+  - url: https://api.example.com/api
+    description: Продакшн сервер
+
+tags:
+  - name: Rates
+    description: Операции с курсами валют
+  - name: Convert
+    description: Конвертация валют
+  - name: Devices
+    description: Управление устройствами
+  - name: Admin
+    description: Административные операции
+
+paths:
+  /:
+    get:
+      tags:
+        - Rates
+      summary: Информация об API
+      description: Получить список всех доступных endpoints
+      operationId: getApiInfo
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfoResponse'
+
+  /rates:
+    get:
+      tags:
+        - Rates
+      summary: Получить курсы валют
+      description: Получить все курсы валют или курс конкретной валюты
+      operationId: getRates
+      parameters:
+        - name: base
+          in: query
+          description: Базовая валюта (3 буквенный код ISO)
+          required: false
+          schema:
+            type: string
+            default: USD
+            example: USD
+        - name: target
+          in: query
+          description: Целевая валюта (3 буквенный код ISO). Если указана, возвращается только этот курс
+          required: false
+          schema:
+            type: string
+            example: EUR
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AllRatesResponse'
+                  - $ref: '#/components/schemas/SingleRateResponse'
+        '404':
+          description: Курс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /convert:
+    get:
+      tags:
+        - Convert
+      summary: Конвертировать валюту
+      description: Конвертировать сумму из одной валюты в другую
+      operationId: convertCurrency
+      parameters:
+        - name: amount
+          in: query
+          description: Сумма для конвертации
+          required: true
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            example: 100
+        - name: from
+          in: query
+          description: Исходная валюта (3 буквенный код ISO)
+          required: true
+          schema:
+            type: string
+            example: USD
+        - name: to
+          in: query
+          description: Целевая валюта (3 буквенный код ISO)
+          required: true
+          schema:
+            type: string
+            example: EUR
+        - name: base
+          in: query
+          description: Базовая валюта для расчета (3 буквенный код ISO)
+          required: false
+          schema:
+            type: string
+            default: USD
+            example: USD
+      responses:
+        '200':
+          description: Успешная конвертация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConvertResponse'
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Курсы не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /device/register:
+    post:
+      tags:
+        - Devices
+      summary: Зарегистрировать устройство
+      description: Зарегистрировать новое устройство или обновить информацию о существующем
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+      responses:
+        '200':
+          description: Устройство успешно зарегистрировано/обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /device/info:
+    get:
+      tags:
+        - Devices
+      summary: Получить информацию об устройстве
+      description: Получить информацию о зарегистрированном устройстве
+      operationId: getDeviceInfo
+      parameters:
+        - name: device_id
+          in: query
+          description: Уникальный идентификатор устройства
+          required: true
+          schema:
+            type: string
+            example: unique-device-id-12345
+      responses:
+        '200':
+          description: Информация об устройстве
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceInfoResponse'
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Устройство не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /update:
+    post:
+      tags:
+        - Admin
+      summary: Принудительное обновление курсов
+      description: Принудительно обновить курсы валют с внешнего API
+      operationId: updateRates
+      responses:
+        '200':
+          description: Курсы успешно обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateResponse'
+        '500':
+          description: Ошибка обновления
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ApiInfoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Currency API v1
+        endpoints:
+          type: object
+          additionalProperties:
+            type: string
+
+    AllRatesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        base:
+          type: string
+          example: USD
+        rates:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/RateInfo'
+        count:
+          type: integer
+          example: 166
+
+    SingleRateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        base:
+          type: string
+          example: USD
+        target:
+          type: string
+          example: EUR
+        rate:
+          type: number
+          format: float
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:00:00"
+
+    RateInfo:
+      type: object
+      properties:
+        rate:
+          type: number
+          format: float
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:00:00"
+
+    ConvertResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        amount:
+          type: number
+          format: float
+          example: 100
+        from:
+          type: string
+          example: USD
+        to:
+          type: string
+          example: EUR
+        converted_amount:
+          type: number
+          format: float
+          example: 85.00
+        rate:
+          type: number
+          format: float
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:00:00"
+
+    DeviceRegisterRequest:
+      type: object
+      required:
+        - device_id
+      properties:
+        device_id:
+          type: string
+          description: Уникальный идентификатор устройства
+          example: unique-device-id-12345
+        device_name:
+          type: string
+          description: Название устройства
+          example: iPhone 13
+        device_type:
+          type: string
+          description: Тип устройства
+          example: mobile
+        platform:
+          type: string
+          description: Платформа
+          example: iOS
+        app_version:
+          type: string
+          description: Версия приложения
+          example: "1.0.0"
+
+    DeviceRegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Устройство зарегистрировано
+        device_id:
+          type: integer
+          example: 1
+
+    DeviceInfoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        device:
+          $ref: '#/components/schemas/Device'
+
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        device_id:
+          type: string
+          example: unique-device-id-12345
+        device_name:
+          type: string
+          example: iPhone 13
+        device_type:
+          type: string
+          example: mobile
+        platform:
+          type: string
+          example: iOS
+        app_version:
+          type: string
+          example: "1.0.0"
+        last_active:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:30:00"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15 10:00:00"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:30:00"
+
+    UpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Курсы валют успешно обновлены
+        base_currency:
+          type: string
+          example: USD
+        rates_count:
+          type: integer
+          example: 166
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15 12:35:00"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Описание ошибки
+
