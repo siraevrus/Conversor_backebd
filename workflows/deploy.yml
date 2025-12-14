@@ -1,0 +1,24 @@
+name: Deploy to conversor.onza.me
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Deploy via SSH
+      run: |
+        ssh -o StrictHostKeyChecking=no deployer@81.163.31.224 "
+          cd /var/www/conversor.onza.me/html &&
+          git pull origin main &&
+          echo '✅ Деплой завершен'
+        "
