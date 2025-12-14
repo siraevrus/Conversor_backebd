@@ -1,24 +1,72 @@
-name: Deploy to conversor.onza.me
+name: 🚀 Deploy to conversor.onza.me
+
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Ручной запуск из интерфейса
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
       
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-        
-    - name: Deploy via SSH
-      run: |
-        ssh -o StrictHostKeyChecking=no deployer@81.163.31.224 "
-          cd /var/www/conversor.onza.me/html &&
-          git pull origin main &&
-          echo '✅ Деплой завершен'
-        "
+      - name: 🔍 Lint (опционально)
+        run: echo "Здесь могут быть тесты линтера"
+
+  deploy-production:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+      
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      
+      - name: 🌐 Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: 🚀 Deploy to Server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            # Создаем временную директорию
+            TEMP_DIR=\"/tmp/conversor-deploy-\$(date +%s)\"
+            mkdir -p \$TEMP_DIR
+            
+            # Клонируем/обновляем репозиторий
+            cd \$TEMP_DIR
+            git clone --depth 1 https://github.com/${{ github.repository }}.git . || git pull
+            
+            # Копируем файлы в рабочую директорию
+            sudo rsync -avz --delete --exclude='.git' --exclude='.github' . /var/www/conversor.onza.me/html/
+            
+            # Настраиваем права
+            sudo chown -R deployer:www-data /var/www/conversor.onza.me/html
+            sudo chmod -R 755 /var/www/conversor.onza.me/html
+            
+            # Если есть зависимости (Node.js/Python и т.д.)
+            # npm install --production
+            # pip install -r requirements.txt
+            
+            # Перезапускаем службы если нужно
+            # sudo systemctl restart ваш-сервис
+            
+            # Очищаем временную директорию
+            cd && rm -rf \$TEMP_DIR
+            
+            echo '✅ Деплой завершен успешно!'
+          "
+      
+      - name: 📊 Health Check
+        run: |
+          curl -f https://conversor.onza.me || echo '⚠️ Сайт может быть недоступен'
