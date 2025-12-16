@@ -219,6 +219,8 @@
 <body>
     <div class="header">
         <div class="header-links">
+            <a href="/admin/api_monitor.php" class="header-link">📡 Мониторинг API</a>
+            <a href="/admin/logs.php" class="header-link">📝 Логи</a>
             <a href="/rates.php" class="header-link" target="_blank">💱 Курсы валют</a>
             <a href="?logout=1" class="header-link">Выйти</a>
         </div>
