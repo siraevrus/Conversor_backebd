@@ -34,6 +34,27 @@
             font-size: 0.9em;
         }
 
+        .header-links {
+            float: right;
+            margin-top: -40px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-link {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            color: white;
+            transition: background 0.3s;
+            font-size: 0.9em;
+        }
+
+        .header-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         .logout {
             float: right;
             margin-top: -40px;
@@ -197,7 +218,10 @@
 </head>
 <body>
     <div class="header">
-        <a href="?logout=1" class="logout">Выйти</a>
+        <div class="header-links">
+            <a href="/rates.php" class="header-link" target="_blank">💱 Курсы валют</a>
+            <a href="?logout=1" class="header-link">Выйти</a>
+        </div>
         <h1>📊 Админ панель</h1>
         <div class="subtitle">Управление и мониторинг Currency API</div>
     </div>

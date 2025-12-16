@@ -148,7 +148,7 @@ class ApiRouter {
      */
     private function handleRates($data) {
         $baseCurrency = strtoupper($data['base'] ?? 'USD');
-        $targetCurrency = strtoupper($data['target'] ?? null);
+        $targetCurrency = !empty($data['target']) ? strtoupper($data['target']) : null;
 
         if ($targetCurrency) {
             // Получение конкретного курса

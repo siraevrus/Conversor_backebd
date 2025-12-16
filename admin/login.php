@@ -85,15 +85,6 @@
         button:hover {
             background: #5568d3;
         }
-
-        .note {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f0f0f0;
-            border-radius: 8px;
-            font-size: 0.9em;
-            color: #666;
-        }
     </style>
 </head>
 <body>
@@ -109,11 +100,6 @@
             <input type="password" id="password" name="password" required autofocus>
             <button type="submit">Войти</button>
         </form>
-
-        <div class="note">
-            <strong>Примечание:</strong> По умолчанию пароль: <code>admin123</code><br>
-            В продакшене обязательно измените пароль!
-        </div>
     </div>
 </body>
 </html>

@@ -1,0 +1,971 @@
+openapi: 3.0.0
+info:
+  title: Currency Converter API - Mobile Documentation
+  description: |
+    REST API для получения актуальных курсов валют и конвертации валют.
+    Специально разработано для мобильных приложений iOS и Android.
+    
+    ## Основные возможности:
+    - Получение актуальных курсов валют (обновление каждый час)
+    - Конвертация валют в реальном времени
+    - Регистрация и отслеживание устройств
+    - История запросов для аналитики
+    
+    ## Рекомендации для мобильных приложений:
+    - Кэшируйте курсы валют локально (обновление раз в час)
+    - Регистрируйте устройство при первом запуске приложения
+    - Обрабатывайте ошибки сети gracefully
+    - Используйте device_id для отслеживания статистики
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Локальный сервер разработки
+  - url: https://api.example.com/api
+    description: Продакшн сервер
+    variables:
+      protocol:
+        default: https
+        enum:
+          - https
+          - http
+
+tags:
+  - name: Rates
+    description: |
+      Операции с курсами валют.
+      
+      **Рекомендации:**
+      - Кэшируйте ответы локально на 1 час
+      - Обновляйте курсы при открытии приложения, если прошло более 1 часа
+      - Используйте параметр `target` для получения конкретного курса (быстрее)
+  - name: Convert
+    description: |
+      Конвертация валют.
+      
+      **Рекомендации:**
+      - Валидируйте сумму на клиенте перед запросом
+      - Показывайте курс пользователю вместе с результатом
+      - Кэшируйте популярные конвертации
+  - name: Devices
+    description: |
+      Управление устройствами.
+      
+      **Рекомендации:**
+      - Регистрируйте устройство при первом запуске приложения
+      - Обновляйте информацию при обновлении приложения
+      - Используйте уникальный device_id (UUID для iOS, Android ID для Android)
+
+paths:
+  /:
+    get:
+      tags:
+        - Rates
+      summary: Информация об API
+      description: |
+        Получить список всех доступных endpoints и версию API.
+        Полезно для проверки доступности API и версии.
+      operationId: getApiInfo
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfoResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: Currency API v1
+                    endpoints:
+                      "GET /api/rates": "Получить все курсы валют"
+                      "GET /api/rates?base=USD&target=EUR": "Получить курс конкретной валюты"
+                      "GET /api/convert?amount=100&from=USD&to=EUR": "Конвертировать валюту"
+                      "POST /api/device/register": "Зарегистрировать устройство"
+                      "GET /api/device/info?device_id=xxx": "Получить информацию об устройстве"
+                      "POST /api/update": "Принудительное обновление курсов"
+
+  /rates:
+    get:
+      tags:
+        - Rates
+      summary: Получить курсы валют
+      description: |
+        Получить все курсы валют или курс конкретной валюты.
+        
+        **Использование:**
+        - Без параметров: получить все курсы (базовая валюта USD)
+        - С параметром `target`: получить конкретный курс (рекомендуется для экономии трафика)
+        
+        **Кэширование:**
+        - Курсы обновляются каждый час
+        - Рекомендуется кэшировать ответ на клиенте на 1 час
+        - Проверяйте `last_updated` для определения актуальности данных
+      operationId: getRates
+      parameters:
+        - name: base
+          in: query
+          description: |
+            Базовая валюта (3 буквенный код ISO 4217).
+            По умолчанию USD.
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            default: USD
+            example: USD
+          examples:
+            usd:
+              value: USD
+              summary: Доллар США
+            eur:
+              value: EUR
+              summary: Евро
+            rub:
+              value: RUB
+              summary: Российский рубль
+        - name: target
+          in: query
+          description: |
+            Целевая валюта (3 буквенный код ISO 4217).
+            Если указана, возвращается только этот курс.
+            Рекомендуется использовать для получения конкретного курса (экономия трафика).
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            example: EUR
+          examples:
+            eur:
+              value: EUR
+              summary: Евро
+            rub:
+              value: RUB
+              summary: Российский рубль
+            gbp:
+              value: GBP
+              summary: Британский фунт
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AllRatesResponse'
+                  - $ref: '#/components/schemas/SingleRateResponse'
+              examples:
+                all_rates:
+                  summary: Все курсы валют
+                  value:
+                    success: true
+                    base: USD
+                    rates:
+                      EUR:
+                        rate: 0.85
+                        last_updated: "2024-01-15 12:00:00"
+                      RUB:
+                        rate: 75.50
+                        last_updated: "2024-01-15 12:00:00"
+                      GBP:
+                        rate: 0.73
+                        last_updated: "2024-01-15 12:00:00"
+                    count: 166
+                single_rate:
+                  summary: Конкретный курс
+                  value:
+                    success: true
+                    base: USD
+                    target: EUR
+                    rate: 0.85
+                    last_updated: "2024-01-15 12:00:00"
+        '404':
+          description: Курс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                not_found:
+                  value:
+                    success: false
+                    error: "Курс не найден"
+
+  /convert:
+    get:
+      tags:
+        - Convert
+      summary: Конвертировать валюту
+      description: |
+        Конвертировать сумму из одной валюты в другую.
+        
+        **Валидация:**
+        - Сумма должна быть положительным числом
+        - Валюты должны быть валидными 3-буквенными кодами ISO 4217
+        
+        **Рекомендации:**
+        - Валидируйте сумму на клиенте перед запросом
+        - Показывайте пользователю курс вместе с результатом
+        - Округляйте результат до 2 знаков после запятой для отображения
+      operationId: convertCurrency
+      parameters:
+        - name: amount
+          in: query
+          description: |
+            Сумма для конвертации (положительное число).
+            Поддерживаются десятичные значения.
+          required: true
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            exclusiveMinimum: false
+            example: 100
+          examples:
+            small:
+              value: 10.50
+              summary: Небольшая сумма
+            medium:
+              value: 100
+              summary: Средняя сумма
+            large:
+              value: 10000
+              summary: Большая сумма
+        - name: from
+          in: query
+          description: Исходная валюта (3 буквенный код ISO 4217)
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            example: USD
+          examples:
+            usd:
+              value: USD
+              summary: Доллар США
+            eur:
+              value: EUR
+              summary: Евро
+        - name: to
+          in: query
+          description: Целевая валюта (3 буквенный код ISO 4217)
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            example: EUR
+          examples:
+            eur:
+              value: EUR
+              summary: Евро
+            rub:
+              value: RUB
+              summary: Российский рубль
+        - name: base
+          in: query
+          description: |
+            Базовая валюта для расчета (3 буквенный код ISO 4217).
+            По умолчанию USD.
+            Обычно не требуется указывать, используется автоматически.
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            default: USD
+            example: USD
+      responses:
+        '200':
+          description: Успешная конвертация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConvertResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    amount: 100
+                    from: USD
+                    to: EUR
+                    converted_amount: 85.00
+                    rate: 0.85
+                    last_updated: "2024-01-15 12:00:00"
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_amount:
+                  value:
+                    success: false
+                    error: "Неверная сумма"
+                missing_params:
+                  value:
+                    success: false
+                    error: "Параметры from и to обязательны"
+        '404':
+          description: Курсы не найдены для указанных валют
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rates_not_found:
+                  value:
+                    success: false
+                    error: "Не удалось выполнить конвертацию. Проверьте наличие курсов для указанных валют."
+
+  /device/register:
+    post:
+      tags:
+        - Devices
+      summary: Зарегистрировать устройство
+      description: |
+        Зарегистрировать новое устройство или обновить информацию о существующем.
+        
+        **Когда вызывать:**
+        - При первом запуске приложения
+        - При обновлении версии приложения
+        - При изменении информации об устройстве
+        
+        **device_id:**
+        - Должен быть уникальным для каждого устройства
+        - Рекомендуется использовать UUID (iOS) или Android ID (Android)
+        - Сохраняйте device_id локально после первой регистрации
+        
+        **Рекомендации:**
+        - Вызывайте этот endpoint при первом запуске приложения
+        - Обновляйте app_version при каждом обновлении приложения
+        - Передавайте device_id в заголовке X-Device-ID для других запросов
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+            examples:
+              ios:
+                summary: iOS устройство
+                value:
+                  device_id: "550e8400-e29b-41d4-a716-446655440000"
+                  device_name: "iPhone 13 Pro"
+                  device_type: "mobile"
+                  platform: "iOS"
+                  app_version: "1.2.0"
+              android:
+                summary: Android устройство
+                value:
+                  device_id: "android-1234567890abcdef"
+                  device_name: "Samsung Galaxy S21"
+                  device_type: "mobile"
+                  platform: "Android"
+                  app_version: "1.2.0"
+              minimal:
+                summary: Минимальные данные
+                value:
+                  device_id: "unique-device-id-12345"
+                  platform: "iOS"
+      responses:
+        '200':
+          description: Устройство успешно зарегистрировано/обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+              examples:
+                new_device:
+                  value:
+                    success: true
+                    message: "Устройство зарегистрировано"
+                    device_id: 1
+                updated_device:
+                  value:
+                    success: true
+                    message: "Устройство обновлено"
+                    device_id: 1
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_device_id:
+                  value:
+                    success: false
+                    error: "device_id обязателен"
+        '500':
+          description: Ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /device/info:
+    get:
+      tags:
+        - Devices
+      summary: Получить информацию об устройстве
+      description: |
+        Получить информацию о зарегистрированном устройстве.
+        
+        **Использование:**
+        - Проверка регистрации устройства
+        - Получение последней активности
+        - Отладка проблем с устройством
+      operationId: getDeviceInfo
+      parameters:
+        - name: device_id
+          in: query
+          description: |
+            Уникальный идентификатор устройства.
+            Должен совпадать с device_id, переданным при регистрации.
+          required: true
+          schema:
+            type: string
+            example: unique-device-id-12345
+      responses:
+        '200':
+          description: Информация об устройстве
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceInfoResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    device:
+                      id: 1
+                      device_id: "unique-device-id-12345"
+                      device_name: "iPhone 13"
+                      device_type: "mobile"
+                      platform: "iOS"
+                      app_version: "1.0.0"
+                      last_active: "2024-01-15 12:30:00"
+                      created_at: "2024-01-15 10:00:00"
+                      updated_at: "2024-01-15 12:30:00"
+        '400':
+          description: Неверные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_device_id:
+                  value:
+                    success: false
+                    error: "device_id обязателен"
+        '404':
+          description: Устройство не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                not_found:
+                  value:
+                    success: false
+                    error: "Устройство не найдено"
+
+components:
+  schemas:
+    ApiInfoResponse:
+      type: object
+      required:
+        - success
+        - message
+        - endpoints
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса
+          example: true
+        message:
+          type: string
+          description: Сообщение с версией API
+          example: Currency API v1
+        endpoints:
+          type: object
+          description: Словарь доступных endpoints
+          additionalProperties:
+            type: string
+          example:
+            "GET /api/rates": "Получить все курсы валют"
+            "GET /api/convert?amount=100&from=USD&to=EUR": "Конвертировать валюту"
+
+    AllRatesResponse:
+      type: object
+      required:
+        - success
+        - base
+        - rates
+        - count
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса
+          example: true
+        base:
+          type: string
+          description: Базовая валюта
+          pattern: '^[A-Z]{3}$'
+          example: USD
+        rates:
+          type: object
+          description: |
+            Словарь курсов валют.
+            Ключ - код валюты (ISO 4217), значение - информация о курсе.
+          additionalProperties:
+            $ref: '#/components/schemas/RateInfo'
+          example:
+            EUR:
+              rate: 0.85
+              last_updated: "2024-01-15 12:00:00"
+            RUB:
+              rate: 75.50
+              last_updated: "2024-01-15 12:00:00"
+        count:
+          type: integer
+          description: Количество доступных курсов
+          minimum: 0
+          example: 166
+
+    SingleRateResponse:
+      type: object
+      required:
+        - success
+        - base
+        - target
+        - rate
+        - last_updated
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса
+          example: true
+        base:
+          type: string
+          description: Базовая валюта
+          pattern: '^[A-Z]{3}$'
+          example: USD
+        target:
+          type: string
+          description: Целевая валюта
+          pattern: '^[A-Z]{3}$'
+          example: EUR
+        rate:
+          type: number
+          format: float
+          description: Курс обмена (сколько единиц целевой валюты за 1 единицу базовой)
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          description: Время последнего обновления курса (формат YYYY-MM-DD HH:MM:SS)
+          example: "2024-01-15 12:00:00"
+
+    RateInfo:
+      type: object
+      required:
+        - rate
+        - last_updated
+      properties:
+        rate:
+          type: number
+          format: float
+          description: Курс обмена
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          description: Время последнего обновления
+          example: "2024-01-15 12:00:00"
+
+    ConvertResponse:
+      type: object
+      required:
+        - success
+        - amount
+        - from
+        - to
+        - converted_amount
+        - rate
+        - last_updated
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса
+          example: true
+        amount:
+          type: number
+          format: float
+          description: Исходная сумма
+          example: 100
+        from:
+          type: string
+          description: Исходная валюта
+          pattern: '^[A-Z]{3}$'
+          example: USD
+        to:
+          type: string
+          description: Целевая валюта
+          pattern: '^[A-Z]{3}$'
+          example: EUR
+        converted_amount:
+          type: number
+          format: float
+          description: Конвертированная сумма (округлено до 2 знаков)
+          example: 85.00
+        rate:
+          type: number
+          format: float
+          description: Использованный курс обмена
+          example: 0.85
+        last_updated:
+          type: string
+          format: date-time
+          description: Время последнего обновления курса
+          example: "2024-01-15 12:00:00"
+
+    DeviceRegisterRequest:
+      type: object
+      required:
+        - device_id
+      properties:
+        device_id:
+          type: string
+          description: |
+            Уникальный идентификатор устройства.
+            Рекомендуется использовать UUID для iOS или Android ID для Android.
+            Должен быть постоянным для устройства.
+          example: unique-device-id-12345
+        device_name:
+          type: string
+          description: Название устройства (опционально)
+          example: iPhone 13
+          maxLength: 255
+        device_type:
+          type: string
+          description: Тип устройства (опционально)
+          enum:
+            - mobile
+            - tablet
+            - desktop
+          example: mobile
+        platform:
+          type: string
+          description: Платформа устройства (рекомендуется указывать)
+          enum:
+            - iOS
+            - Android
+            - Web
+          example: iOS
+        app_version:
+          type: string
+          description: Версия приложения (рекомендуется указывать)
+          example: "1.0.0"
+          pattern: '^\d+\.\d+\.\d+'
+
+    DeviceRegisterResponse:
+      type: object
+      required:
+        - success
+        - message
+        - device_id
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности операции
+          example: true
+        message:
+          type: string
+          description: Сообщение о результате операции
+          enum:
+            - "Устройство зарегистрировано"
+            - "Устройство обновлено"
+          example: "Устройство зарегистрировано"
+        device_id:
+          type: integer
+          description: Внутренний ID устройства в базе данных
+          example: 1
+
+    DeviceInfoResponse:
+      type: object
+      required:
+        - success
+        - device
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса
+          example: true
+        device:
+          $ref: '#/components/schemas/Device'
+
+    Device:
+      type: object
+      required:
+        - id
+        - device_id
+        - last_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Внутренний ID устройства в базе данных
+          example: 1
+        device_id:
+          type: string
+          description: Уникальный идентификатор устройства
+          example: unique-device-id-12345
+        device_name:
+          type: string
+          nullable: true
+          description: Название устройства
+          example: iPhone 13
+        device_type:
+          type: string
+          nullable: true
+          description: Тип устройства
+          example: mobile
+        platform:
+          type: string
+          nullable: true
+          description: Платформа устройства
+          example: iOS
+        app_version:
+          type: string
+          nullable: true
+          description: Версия приложения
+          example: "1.0.0"
+        last_active:
+          type: string
+          format: date-time
+          description: Время последней активности устройства
+          example: "2024-01-15 12:30:00"
+        created_at:
+          type: string
+          format: date-time
+          description: Время регистрации устройства
+          example: "2024-01-15 10:00:00"
+        updated_at:
+          type: string
+          format: date-time
+          description: Время последнего обновления информации об устройстве
+          example: "2024-01-15 12:30:00"
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          description: Флаг успешности запроса (всегда false для ошибок)
+          example: false
+        error:
+          type: string
+          description: Описание ошибки
+          example: "Описание ошибки"
+
+  parameters:
+    DeviceIdHeader:
+      name: X-Device-ID
+      in: header
+      description: |
+        Уникальный идентификатор устройства.
+        Альтернатива передаче device_id в параметрах запроса.
+        Рекомендуется использовать для всех запросов после регистрации устройства.
+      required: false
+      schema:
+        type: string
+        example: unique-device-id-12345
+
+  examples:
+    iOSExample:
+      summary: Пример использования для iOS (Swift)
+      description: |
+        ```swift
+        // Регистрация устройства
+        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        let url = URL(string: "https://api.example.com/api/device/register")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+            "device_id": deviceId,
+            "device_name": UIDevice.current.name,
+            "platform": "iOS",
+            "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Обработка ответа
+        }.resume()
+        
+        // Получение курса валюты
+        let ratesUrl = URL(string: "https://api.example.com/api/rates?base=USD&target=EUR")!
+        URLSession.shared.dataTask(with: ratesUrl) { data, response, error in
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let rate = json["rate"] as? Double {
+                print("Курс USD/EUR: \(rate)")
+            }
+        }.resume()
+        
+        // Конвертация валюты
+        let convertUrl = URL(string: "https://api.example.com/api/convert?amount=100&from=USD&to=EUR")!
+        URLSession.shared.dataTask(with: convertUrl) { data, response, error in
+            if let data = data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let convertedAmount = json["converted_amount"] as? Double {
+                print("100 USD = \(convertedAmount) EUR")
+            }
+        }.resume()
+        ```
+    AndroidExample:
+      summary: Пример использования для Android (Kotlin)
+      description: |
+        ```kotlin
+        // Регистрация устройства
+        val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+        val url = "https://api.example.com/api/device/register"
+        
+        val requestBody = JSONObject().apply {
+            put("device_id", deviceId)
+            put("device_name", Build.MODEL)
+            put("platform", "Android")
+            put("app_version", BuildConfig.VERSION_NAME)
+        }
+        
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        
+        OkHttpClient().newCall(request).enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) {
+                // Обработка ответа
+            }
+            override fun onFailure(call: Call, e: IOException) {
+                // Обработка ошибки
+            }
+        })
+        
+        // Получение курса валюты
+        val ratesUrl = "https://api.example.com/api/rates?base=USD&target=EUR"
+        OkHttpClient().newCall(Request.Builder().url(ratesUrl).build())
+            .enqueue(object : Callback {
+                override fun onResponse(call: Call, response: Response) {
+                    val json = JSONObject(response.body?.string())
+                    val rate = json.getDouble("rate")
+                    println("Курс USD/EUR: $rate")
+                }
+                override fun onFailure(call: Call, e: IOException) {}
+            })
+        
+        // Конвертация валюты
+        val convertUrl = "https://api.example.com/api/convert?amount=100&from=USD&to=EUR"
+        OkHttpClient().newCall(Request.Builder().url(convertUrl).build())
+            .enqueue(object : Callback {
+                override fun onResponse(call: Call, response: Response) {
+                    val json = JSONObject(response.body?.string())
+                    val convertedAmount = json.getDouble("converted_amount")
+                    println("100 USD = $convertedAmount EUR")
+                }
+                override fun onFailure(call: Call, e: IOException) {}
+            })
+        ```
+
+# Дополнительная информация для мобильных разработчиков
+
+## Обработка ошибок
+
+### Типичные ошибки и их обработка:
+
+1. **Ошибки сети:**
+   - Проверяйте доступность интернета перед запросом
+   - Используйте кэшированные данные при отсутствии сети
+   - Показывайте понятные сообщения пользователю
+
+2. **Ошибки валидации (400):**
+   - Валидируйте данные на клиенте перед отправкой
+   - Проверяйте формат валют (3 буквы, заглавные)
+   - Проверяйте сумму (положительное число)
+
+3. **Ошибки "Не найдено" (404):**
+   - Проверяйте наличие курсов для запрашиваемых валют
+   - Предлагайте альтернативные валюты
+   - Используйте fallback на популярные валюты
+
+4. **Ошибки сервера (500):**
+   - Повторяйте запрос с экспоненциальной задержкой
+   - Используйте кэшированные данные
+   - Информируйте пользователя о временных проблемах
+
+## Рекомендации по производительности
+
+1. **Кэширование:**
+   - Кэшируйте курсы валют локально на 1 час
+   - Обновляйте кэш в фоновом режиме
+   - Используйте параметр `target` для получения конкретных курсов
+
+2. **Оптимизация запросов:**
+   - Группируйте запросы курсов для нескольких валют
+   - Используйте batch запросы где возможно
+   - Минимизируйте количество запросов при конвертации
+
+3. **Офлайн режим:**
+   - Сохраняйте последние курсы локально
+   - Позволяйте использовать приложение офлайн с кэшированными данными
+   - Показывайте предупреждение о устаревших данных
+
+## Безопасность
+
+1. **device_id:**
+   - Не используйте чувствительные данные для device_id
+   - Используйте UUID или Android ID
+   - Не передавайте персональные данные в device_id
+
+2. **HTTPS:**
+   - Всегда используйте HTTPS в продакшене
+   - Проверяйте SSL сертификаты
+   - Используйте certificate pinning для критичных приложений
+
+3. **Валидация:**
+   - Валидируйте все данные на клиенте
+   - Не доверяйте данным от сервера без проверки
+   - Санитизируйте пользовательский ввод
+
+## Лучшие практики
+
+1. **Регистрация устройства:**
+   - Регистрируйте устройство при первом запуске
+   - Обновляйте информацию при обновлении приложения
+   - Сохраняйте device_id локально после регистрации
+
+2. **Обработка ответов:**
+   - Всегда проверяйте поле `success` в ответе
+   - Обрабатывайте все возможные ошибки
+   - Логируйте ошибки для отладки
+
+3. **UX:**
+   - Показывайте индикатор загрузки при запросах
+   - Кэшируйте данные для мгновенного отображения
+   - Обновляйте данные в фоне
+   - Показывайте время последнего обновления
+

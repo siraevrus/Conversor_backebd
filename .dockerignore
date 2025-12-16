@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node modules (если есть)
+node_modules/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database
+*.sql
+*.sqlite
+*.db
+
+# Build artifacts
+build/
+dist/
+

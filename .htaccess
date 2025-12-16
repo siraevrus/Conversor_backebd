@@ -1,5 +1,35 @@
 RewriteEngine On
 
+# Production Security Settings
+# Защита от просмотра директорий
+Options -Indexes
+
+# Защита конфиденциальных файлов
+<FilesMatch "\.(env|log|ini|conf|sql|md)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Защита системных файлов
+<FilesMatch "^(composer\.(json|lock)|package\.json|\.gitignore)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Защита от XSS и других атак
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Защита от опасных методов
+<IfModule mod_rewrite.c>
+    RewriteCond %{REQUEST_METHOD} ^(TRACE|DELETE|TRACK) [NC]
+    RewriteRule ^(.*)$ - [F,L]
+</IfModule>
+
 # Разрешаем доступ к админ панели
 RewriteCond %{REQUEST_URI} ^/admin/
 RewriteCond %{REQUEST_FILENAME} !-f
