@@ -117,17 +117,22 @@ class Device {
      */
     public function logRequest($deviceId, $endpoint, $method, $ipAddress = null, $userAgent = null) {
         try {
-            // Получаем ID устройства
-            $device = $this->getDevice($deviceId);
-            $deviceDbId = $device ? $device['id'] : null;
+            // Получаем ID устройства (если device_id передан)
+            $deviceDbId = null;
+            if ($deviceId) {
+                $device = $this->getDevice($deviceId);
+                $deviceDbId = $device ? $device['id'] : null;
+            }
 
+            // Логируем запрос даже если device_id не найден
+            // Это позволяет видеть все запросы, включая от незарегистрированных устройств
             $query = "INSERT INTO api_requests 
                 (device_id, endpoint, method, ip_address, user_agent) 
                 VALUES (:device_id, :endpoint, :method, :ip_address, :user_agent)";
 
             $stmt = $this->conn->prepare($query);
             $stmt->execute([
-                ':device_id' => $deviceDbId,
+                ':device_id' => $deviceDbId, // может быть null
                 ':endpoint' => $endpoint,
                 ':method' => $method,
                 ':ip_address' => $ipAddress ?? $_SERVER['REMOTE_ADDR'] ?? null,

@@ -74,22 +74,35 @@ $stmt = $conn->query("
 ");
 $stats['platforms'] = $stmt->fetchAll();
 
-// Последние запросы
+// Последние запросы (включая без device_id)
 $stmt = $conn->query("
     SELECT 
         ar.created_at as time,
         ar.endpoint,
         ar.method,
         ar.ip_address,
+        ar.user_agent,
         d.platform,
         d.app_version,
-        d.device_id
+        d.device_id,
+        CASE WHEN ar.device_id IS NULL THEN 'Не зарегистрировано' ELSE 'Зарегистрировано' END as device_status
     FROM api_requests ar
     LEFT JOIN devices d ON ar.device_id = d.id
     ORDER BY ar.created_at DESC
     LIMIT 50
 ");
 $stats['recent_requests'] = $stmt->fetchAll();
+
+// Статистика запросов без device_id
+$stmt = $conn->query("
+    SELECT 
+        COUNT(*) as total_without_device,
+        COUNT(DISTINCT ip_address) as unique_ips_without_device
+    FROM api_requests
+    WHERE device_id IS NULL
+    AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+");
+$stats['without_device'] = $stmt->fetch();
 
 // Статистика по часам (последние 24 часа)
 $stmt = $conn->query("
@@ -292,6 +305,15 @@ $stats['hourly'] = $stmt->fetchAll();
                 <div class="label">Используемых endpoints</div>
                 <div class="value"><?= number_format($stats['today']['unique_endpoints'] ?? 0) ?></div>
             </div>
+            <?php if (($stats['without_device']['total_without_device'] ?? 0) > 0): ?>
+            <div class="stat-card" style="border-left: 4px solid #ffc107;">
+                <div class="label">⚠️ Без device_id (24ч)</div>
+                <div class="value" style="color: #ffc107;"><?= number_format($stats['without_device']['total_without_device'] ?? 0) ?></div>
+                <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                    IP: <?= number_format($stats['without_device']['unique_ips_without_device'] ?? 0) ?>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Топ endpoints -->
@@ -378,18 +400,30 @@ $stats['hourly'] = $stmt->fetchAll();
                         <th>Время</th>
                         <th>Endpoint</th>
                         <th>Метод</th>
+                        <th>Статус устройства</th>
                         <th>Платформа</th>
                         <th>IP</th>
+                        <th>User Agent</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($stats['recent_requests'] as $request): ?>
-                    <tr>
+                    <tr style="<?= $request['device_id'] ? '' : 'background: #fff3cd;' ?>">
                         <td><?= date('d.m.Y H:i:s', strtotime($request['time'])) ?></td>
                         <td><code><?= htmlspecialchars($request['endpoint']) ?></code></td>
                         <td><span class="badge badge-info"><?= htmlspecialchars($request['method']) ?></span></td>
-                        <td><?= htmlspecialchars($request['platform'] ?? 'Unknown') ?></td>
+                        <td>
+                            <?php if ($request['device_id']): ?>
+                                <span class="badge badge-success">✓ Зарегистрировано</span>
+                            <?php else: ?>
+                                <span class="badge" style="background: #ffc107; color: #856404;">⚠ Без device_id</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= htmlspecialchars($request['platform'] ?? '-') ?></td>
                         <td><?= htmlspecialchars($request['ip_address'] ?? '-') ?></td>
+                        <td style="font-size: 0.85em; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="<?= htmlspecialchars($request['user_agent'] ?? '') ?>">
+                            <?= htmlspecialchars(substr($request['user_agent'] ?? '-', 0, 50)) ?><?= strlen($request['user_agent'] ?? '') > 50 ? '...' : '' ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

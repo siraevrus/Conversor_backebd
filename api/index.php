@@ -53,8 +53,9 @@ class ApiRouter {
      * Логирование запроса
      */
     private function logRequest($deviceId, $endpoint) {
+        // Логируем все запросы, даже без device_id
         $this->deviceModel->logRequest(
-            $deviceId,
+            $deviceId, // может быть null
             $endpoint,
             $this->getMethod(),
             $_SERVER['REMOTE_ADDR'] ?? null,
@@ -80,10 +81,8 @@ class ApiRouter {
         $data = $this->getRequestData();
         $deviceId = $data['device_id'] ?? $_SERVER['HTTP_X_DEVICE_ID'] ?? null;
 
-        // Логирование запроса
-        if ($deviceId) {
-            $this->logRequest($deviceId, $path);
-        }
+        // Логирование запроса (всегда, даже без device_id)
+        $this->logRequest($deviceId, $path);
 
         // Роутинг
         switch ($path) {
