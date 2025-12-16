@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /rates.php
+Disallow: /logs/
+Disallow: /tmp/
+Disallow: /temp/
+
+# Sitemap (если есть)
+# Sitemap: https://conversor.onza.me/sitemap.xml
+
