@@ -24,16 +24,10 @@ info:
     name: MIT
 
 servers:
+  - url: https://conversor.onza.me/api
+    description: Production сервер
   - url: http://localhost:8000/api
     description: Локальный сервер разработки
-  - url: https://api.example.com/api
-    description: Продакшн сервер
-    variables:
-      protocol:
-        default: https
-        enum:
-          - https
-          - http
 
 tags:
   - name: Rates
