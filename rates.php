@@ -77,6 +77,7 @@ if ($lastUpdated) {
             color: white;
             padding: 40px;
             text-align: center;
+            margin-top: 30px;
         }
 
         .header h1 {
