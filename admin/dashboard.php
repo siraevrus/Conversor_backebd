@@ -36,7 +36,7 @@
 
         .header-links {
             float: right;
-            margin-top: -40px;
+            margin-top: 10px;
             display: flex;
             gap: 10px;
         }
